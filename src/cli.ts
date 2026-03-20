@@ -34,12 +34,12 @@ const version = require('../package.json').version;
 
 export async function readStdin(input: NodeJS.ReadStream = process.stdin): Promise<string> {
 	return new Promise((resolve, reject) => {
-		let data = '';
+		const chunks: string[] = [];
 		input.setEncoding('utf8');
-		input.on('data', chunk => {
-			data += chunk;
+		input.on('data', (chunk: string) => {
+			chunks.push(chunk);
 		});
-		input.on('end', () => resolve(data));
+		input.on('end', () => resolve(chunks.join('')));
 		input.on('error', reject);
 	});
 }
@@ -61,7 +61,6 @@ export async function parseSource(source: string | undefined, options: ParseOpti
 	let url: string | undefined;
 
 	const usesStdin = !source || source === '-';
-	const sourceLabel = usesStdin ? 'stdin' : source;
 	const isUrl = !usesStdin && (source.startsWith('http://') || source.startsWith('https://'));
 
 	if (usesStdin) {
@@ -108,9 +107,10 @@ export async function parseSource(source: string | undefined, options: ParseOpti
 	}
 
 	// Check if parsing produced meaningful content
-	const textContent = result.content.replace(/<[^>]*>/g, '').trim();
+	const textContent = parseLinkedomHTML(`<!DOCTYPE html><html><body>${result.content}</body></html>`)
+		.body.textContent?.trim() || '';
 	if (!textContent) {
-		throw new Error(`No content could be extracted from ${sourceLabel}`);
+		throw new Error(`No content could be extracted from ${usesStdin ? 'stdin' : source}`);
 	}
 
 	// Format output
